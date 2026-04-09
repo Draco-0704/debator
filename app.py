@@ -94,6 +94,11 @@ background:linear-gradient(120deg,rgba(6,13,20,.95) 0%,rgba(6,13,20,.45) 46%,rgb
 .v-word{font-size:clamp(2rem,5vw,3.3rem);line-height:.95;font-weight:800;letter-spacing:-.05em}.v-word.real{color:var(--good)}.v-word.fake{color:var(--bad)}.v-word.misleading{color:var(--warn)}
 .v-copy{max-width:42rem;color:var(--muted);font-size:.96rem;line-height:1.68;margin-top:1rem}.track{width:min(380px,100%);margin:.95rem 0;height:9px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden}.track span{display:block;height:100%;border-radius:999px}
 .track .real{background:linear-gradient(90deg,#28a574,#35c58e)}.track .fake{background:linear-gradient(90deg,#f25656,#ff7373)}.track .misleading{background:linear-gradient(90deg,#e7a22d,#f3ba4c)}
+.metric-stack{margin-top:1rem;display:grid;gap:.75rem}.metric-bar{height:12px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;display:flex}
+.metric-bar span{display:block;height:100%}.metric-bar .real{background:linear-gradient(90deg,#28a574,#35c58e)}.metric-bar .fake{background:linear-gradient(90deg,#f25656,#ff7373)}.metric-bar .misleading{background:linear-gradient(90deg,#e7a22d,#f3ba4c)}
+.metric-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.8rem}.metric-item{padding-top:.7rem;border-top:1px solid rgba(255,255,255,.09)}
+.metric-item strong{display:block;font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.58);margin-bottom:.2rem}.metric-item span{display:block;font-family:'IBM Plex Mono',monospace;font-size:1.05rem}
+.metric-item.real span{color:var(--good)}.metric-item.fake span{color:var(--bad)}.metric-item.misleading span{color:var(--warn)}
 [data-testid="stExpander"]{border:1px solid var(--line)!important;border-radius:20px!important;background:rgba(255,255,255,.03)!important}
 .debate{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1rem}.face{padding:1rem;border:1px solid var(--line);border-radius:20px;background:rgba(255,255,255,.03)}.face.ver{background:linear-gradient(180deg,rgba(53,197,142,.10),rgba(255,255,255,.025));border-color:rgba(53,197,142,.22)}.face.fal{background:linear-gradient(180deg,rgba(255,115,115,.10),rgba(255,255,255,.025));border-color:rgba(255,115,115,.22)}
 .face-head{display:flex;justify-content:space-between;gap:.75rem;align-items:center;padding-bottom:.65rem;margin-bottom:.75rem;border-bottom:1px solid rgba(255,255,255,.08)}.face-title{font-size:.9rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}.face-tone{font-size:.75rem;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
@@ -119,6 +124,26 @@ def _safe_url(url: str) -> str | None:
     if parsed.scheme in {"http", "https"} and parsed.netloc:
         return html.escape(raw, quote=True)
     return None
+
+
+def _confidence_metrics(verdict: dict) -> dict[str, float]:
+    metrics = verdict.get("confidence_metrics") or {}
+    normalized: dict[str, float] = {}
+    for label in ("REAL", "FAKE", "MISLEADING"):
+        try:
+            normalized[label] = max(0.0, min(float(metrics.get(label, 0.0)), 1.0))
+        except (TypeError, ValueError):
+            normalized[label] = 0.0
+
+    total = sum(normalized.values())
+    if total <= 0:
+        fallback = max(0.0, min(float(verdict.get("overall_confidence", 0.5)), 1.0))
+        overall = verdict.get("overall_verdict", "MISLEADING")
+        normalized = {"REAL": 0.0, "FAKE": 0.0, "MISLEADING": 0.0}
+        normalized[overall if overall in normalized else "MISLEADING"] = fallback or 1.0
+        total = sum(normalized.values())
+
+    return {label: value / total for label, value in normalized.items()}
 
 
 def _render_sidebar() -> None:
@@ -372,8 +397,12 @@ def _render_verdict(verdict: dict) -> None:
         overall = "MISLEADING"
     key = overall.lower()
     confidence = max(0.0, min(float(verdict.get("overall_confidence", 0.5)), 1.0))
+    metrics = _confidence_metrics(verdict)
+    real_pct = metrics["REAL"] * 100
+    fake_pct = metrics["FAKE"] * 100
+    misleading_pct = metrics["MISLEADING"] * 100
     st.markdown(
-        f'<section class="section"><div class="head"><div><div class="label">Article verdict</div><div class="title">Fast call, visible confidence.</div></div><div class="copy">The final judge weighs both retrieval paths and compresses the debate into one article-level decision.</div></div><div class="verdict"><div class="label">Final call</div><div class="v-word {key}">{overall}</div><div class="copy" style="margin-top:.45rem;color:var(--text);font-weight:700">{confidence:.0%} confidence</div><div class="track"><span class="{key}" style="width:{confidence*100:.0f}%"></span></div><div class="v-copy">{_escape(verdict.get("summary",""))}</div></div></section>',
+        f'<section class="section"><div class="head"><div><div class="label">Article verdict</div><div class="title">Fast call, visible confidence.</div></div><div class="copy">The final call now comes from claim-level scoring, and the metric bar shows how strongly the article leans real, fake, or misleading.</div></div><div class="verdict"><div class="label">Final call</div><div class="v-word {key}">{overall}</div><div class="copy" style="margin-top:.45rem;color:var(--text);font-weight:700">{confidence:.0%} confidence</div><div class="track"><span class="{key}" style="width:{confidence*100:.0f}%"></span></div><div class="metric-stack"><div class="metric-bar"><span class="real" style="width:{real_pct:.1f}%"></span><span class="fake" style="width:{fake_pct:.1f}%"></span><span class="misleading" style="width:{misleading_pct:.1f}%"></span></div><div class="metric-grid"><div class="metric-item real"><strong>Real</strong><span>{real_pct:.0f}%</span></div><div class="metric-item fake"><strong>Fake</strong><span>{fake_pct:.0f}%</span></div><div class="metric-item misleading"><strong>Misleading</strong><span>{misleading_pct:.0f}%</span></div></div></div><div class="v-copy">{_escape(verdict.get("summary",""))}</div></div></section>',
         unsafe_allow_html=True,
     )
     if verdict.get("reasoning"):
