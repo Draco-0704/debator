@@ -1,0 +1,204 @@
+================================================================
+       MASTER PLAN: MULTI-AGENT FAKE NEWS DEBATER
+       A Research-Grade NLP + Agentic AI Project (Free Tier)
+================================================================
+
+
+----------------------------------------------------------------
+1. FREE TIER STACK
+----------------------------------------------------------------
+
+Component        | Tool                              | Why Free
+-----------------|-----------------------------------|------------------------
+LLM (all agents) | Groq API (llama-3-70b)            | 14,400 req/day free
+Web Search       | DuckDuckGo (no key) / Serper.dev  | No credit card needed
+NLP - NER        | spaCy (local)                     | Runs fully offline
+NLP - Stance     | HuggingFace Inference API         | Free tier available
+Frontend         | Streamlit                         | Free + simple
+Hosting          | Streamlit Community Cloud         | Free permanent URL
+Language         | Python                            | Free obviously
+
+
+----------------------------------------------------------------
+2. ARCHITECTURE OVERVIEW
+----------------------------------------------------------------
+
+User submits news article
+         |
+         v
+   [Claim Extractor]          <-- spaCy NER + Groq LLM
+         |
+    _____|_____
+    |         |
+    v         v
+[Verifier]  [Falsifier]       <-- Both search web independently
+ Agent       Agent
+    |         |
+ Evidence   Evidence
+    |_________|
+         |
+         v
+   [Judge Agent]              <-- Weighs both sides, gives verdict
+         |
+         v
+  Final Verdict + Report
+
+
+----------------------------------------------------------------
+3. PROJECT FOLDER STRUCTURE
+----------------------------------------------------------------
+
+fake-news-debater/
+├── agents/
+│   ├── claim_extractor.py     # NLP pipeline
+│   ├── verifier_agent.py      # Pro-truth agent
+│   ├── falsifier_agent.py     # Anti-truth agent
+│   └── judge_agent.py         # Final verdict
+├── tools/
+│   ├── web_search.py          # DuckDuckGo wrapper
+│   └── stance_detector.py     # HuggingFace NLI
+├── app.py                     # Streamlit frontend
+├── requirements.txt
+└── README.md
+
+
+----------------------------------------------------------------
+4. BUILD PHASES
+----------------------------------------------------------------
+
+PHASE 1 — NLP Foundation (Day 1-2)
+------------------------------------
+- Set up spaCy for Named Entity Recognition (who, where, what)
+- Integrate HuggingFace cross-encoder/nli-deberta-v3-small
+  for stance detection
+- Build claim_extractor.py:
+    Input  -> raw news article
+    Output -> 3 to 5 key factual claims
+
+PHASE 2 — Tool Layer (Day 2-3)
+--------------------------------
+- Build DuckDuckGo search wrapper
+    Library: duckduckgo-search (no API key required)
+    Per claim: fetch top 5 evidence snippets from web
+- Build stance scorer:
+    Does this evidence SUPPORT or CONTRADICT the claim?
+    Uses NLI model to score each snippet
+
+PHASE 3 — Agent Logic (Day 3-5)
+---------------------------------
+- Verifier Agent:
+    * Searches for supporting evidence per claim
+    * Builds a "pro-truth" case using Groq LLM
+    * System prompt: "You are trying to VERIFY this claim"
+
+- Falsifier Agent:
+    * Searches for contradicting evidence per claim
+    * Builds a "counter-truth" case using Groq LLM
+    * System prompt: "You are trying to FALSIFY this claim"
+
+- Both agents use identical tools but opposite objectives
+
+PHASE 4 — Judge Agent (Day 5-6)
+---------------------------------
+- Receives full report from Verifier + Falsifier
+- Scores each claim independently:
+    SUPPORTED / REFUTED / UNVERIFIABLE
+- Outputs final article verdict:
+    REAL / FAKE / MISLEADING  +  confidence percentage
+- Produces a human-readable reasoning paragraph
+- This transcript = built-in explainability
+
+PHASE 5 — Streamlit UI (Day 6-7)
+----------------------------------
+- Text input box: paste article text or URL
+- Live debate display:
+    Left panel  -> Verifier arguments
+    Right panel -> Falsifier arguments
+- Final verdict card:
+    Green  = REAL
+    Red    = FAKE
+    Yellow = MISLEADING
+- Deploy to Streamlit Community Cloud (free, permanent URL)
+
+
+----------------------------------------------------------------
+5. API KEYS NEEDED (ALL FREE)
+----------------------------------------------------------------
+
+Service         | How to Get                  | Free Limit
+----------------|-----------------------------|-----------------
+Groq            | groq.com -> free account    | 14,400 req/day
+Serper.dev      | serper.dev -> free signup   | 100 searches/day
+HuggingFace     | huggingface.co -> token     | Generous free
+DuckDuckGo      | No key needed               | Unlimited (slow)
+
+
+----------------------------------------------------------------
+6. requirements.txt
+----------------------------------------------------------------
+
+groq
+spacy
+transformers
+streamlit
+duckduckgo-search
+requests
+python-dotenv
+
+
+----------------------------------------------------------------
+7. RESEARCH PAPER CONTRIBUTIONS
+----------------------------------------------------------------
+
+As you build, document these as your novel contributions:
+
+1. Adversarial Debate Framing
+   - Novel over single-model classifiers
+   - Two agents with opposing objectives = richer signal
+
+2. Claim-Level Granularity
+   - Verdict given per individual claim, not just per article
+   - More interpretable and trustworthy outputs
+
+3. Stance Detection as Evidence Scoring
+   - NLI model repurposed for ranking web evidence quality
+   - Bridges retrieval and reasoning
+
+4. Built-in Explainability
+   - The debate transcript IS the explanation
+   - No need for post-hoc XAI — transparency is structural
+
+Paper Title Suggestion:
+"Adversarial Multi-Agent Debate for Automated Misinformation Detection"
+
+
+----------------------------------------------------------------
+8. FREE TIER LIMITATIONS & WORKAROUNDS
+----------------------------------------------------------------
+
+Problem                    | Workaround
+---------------------------|-----------------------------------
+Groq rate limits           | Add time.sleep(1) between calls
+DuckDuckGo blocking        | Rotate to Serper.dev as fallback
+HuggingFace cold start     | Use local spaCy model as backup
+Streamlit session timeout  | Cache results with @st.cache_data
+
+
+----------------------------------------------------------------
+9. RECOMMENDED START ORDER
+----------------------------------------------------------------
+
+Day 1  -> Set up project structure + install dependencies
+Day 2  -> Build and test claim_extractor.py (most critical)
+Day 3  -> Build web_search.py + stance_detector.py tools
+Day 4  -> Build verifier_agent.py + falsifier_agent.py
+Day 5  -> Build judge_agent.py + connect all agents
+Day 6  -> Build Streamlit UI (app.py)
+Day 7  -> Test end-to-end + deploy to Streamlit Cloud
+
+Start with Phase 1. Once claim extraction works cleanly,
+everything else plugs in naturally.
+
+================================================================
+END OF PLAN
+================================================================
